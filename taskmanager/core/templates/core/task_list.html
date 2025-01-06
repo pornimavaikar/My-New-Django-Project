@@ -1,0 +1,125 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Tasks</h2>
+            {% if user.role != 'RM' %}
+            <a href="{% url 'task_create' %}" class="btn btn-primary">Create New Task</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tasks Assigned to Me (visible to all roles) -->
+    {% if assigned_tasks %}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Tasks Assigned to Me</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Assigned By</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in assigned_tasks %}
+                        <tr>
+                            <td>{{ task.title }}</td>
+                            <td>{{ task.description|truncatewords:10 }}</td>
+                            <td>{{ task.assigned_by.username }}</td>
+                            <td>{{ task.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-info btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No tasks are currently assigned to you.
+    </div>
+    {% endif %}
+
+    <!-- Tasks Created by Me (visible to TL/SRM/ADMIN) -->
+    {% if created_tasks %}
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Tasks Created by Me</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Assigned To</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in created_tasks %}
+                        <tr>
+                            <td>{{ task.title }}</td>
+                            <td>{{ task.assigned_to.username }}</td>
+                            <td>{{ task.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-info btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Team Tasks (visible to TL/SRM) -->
+    {% if team_tasks %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Team Tasks</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Assigned To</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in team_tasks %}
+                        <tr>
+                            <td>{{ task.title }}</td>
+                            <td>{{ task.assigned_to.username }}</td>
+                            <td>{{ task.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-info btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

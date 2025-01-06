@@ -1,0 +1,299 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="container-fluid py-4">
+    {% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+    <!-- User Info Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-primary text-white shadow">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-1">Welcome, {{ user.get_full_name|default:user.username }}</h3>
+                            <p class="mb-0 opacity-75">Role: {{ user.get_role_display }}</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            {% if user.role != 'RM' %}
+                            <a href="{% url 'task_create' %}" class="btn btn-light">
+                                <i class="fas fa-plus-circle me-2"></i>Create Task
+                            </a>
+                            {% endif %}
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Add this after the User Info Section -->
+<!-- Attendance Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary">
+                    <i class="fas fa-clock me-2"></i>Attendance Dashboard
+                </h5>
+                <div>
+                    <form method="post" action="{% url 'mark_attendance' %}" class="d-inline">
+                        {% csrf_token %}
+                        {% if not today_attendance %}
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-sign-in-alt me-2"></i>Mark Check-in
+                            </button>
+                        {% elif not today_attendance.check_out %}
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="fas fa-sign-out-alt me-2"></i>Mark Check-out
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-secondary btn-sm" disabled>
+                                <i class="fas fa-check-circle me-2"></i>Attendance Completed
+                            </button>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            <div class="card-body">
+                
+<!-- Personal Attendance -->
+<div class="mb-4">
+    <h6 class="text-primary mb-3">Your Attendance</h6>
+    {% if today_attendance %}
+        <div class="d-flex align-items-center">
+            <span class="badge bg-success me-2">
+                <i class="fas fa-check"></i>
+            </span>
+            <div>
+                <p class="mb-0">Check-in: {{ today_attendance.get_formatted_check_in }}</p>
+                {% if today_attendance.check_out %}
+                    <p class="mb-0">Check-out: {{ today_attendance.get_formatted_check_out }}</p>
+                {% endif %}
+                <small class="text-muted">Date: {{ today_attendance.date|date:"d M Y" }}</small>
+                <small class="ms-2 badge bg-{{ today_attendance.status|lower }}">
+                    {{ today_attendance.status }}
+                </small>
+            </div>
+        </div>
+    {% else %}
+        <div class="d-flex align-items-center">
+            <span class="badge bg-warning me-2">
+                <i class="fas fa-exclamation"></i>
+            </span>
+            <p class="mb-0">Attendance not marked for today</p>
+        </div>
+    {% endif %}
+</div>
+                <!-- Seniors Attendance (visible to all except ADMIN) -->
+                {% if user_role != 'ADMIN' and seniors_attendance %}
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">Reporting Manager's Attendance</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th>Check-in Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for attendance in seniors_attendance %}
+                                        <tr>
+                                            <td>{{ attendance.user.get_full_name|default:attendance.user.username }}</td>
+                                            <td>{{ attendance.user.get_role_display }}</td>
+                                            <td>{{ attendance.check_in|date:"H:i:s" }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ attendance.status|lower }}">
+                                                    {{ attendance.status }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Team Attendance (visible only to seniors) -->
+                {% if is_senior and team_attendance %}
+                    <div class="mb-3">
+                        <h6 class="text-primary mb-3">Team Attendance</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Team Member</th>
+                                        <th>Role</th>
+                                        <th>Check-in Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for attendance in team_attendance %}
+                                        <tr>
+                                            <td>{{ attendance.user.get_full_name|default:attendance.user.username }}</td>
+                                            <td>{{ attendance.user.get_role_display }}</td>
+                                            <td>{{ attendance.check_in|date:"H:i:s" }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ attendance.status|lower }}">
+                                                    {{ attendance.status }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row g-4">
+    <!-- Assigned Tasks Section -->
+    <div class="col-md-6">
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-tasks me-2"></i>Assigned Tasks
+                    </h5>
+                    <a href="{% url 'task_list' %}" class="btn btn-sm btn-primary">View All</a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if assigned_tasks %}
+                    <div class="list-group">
+                        {% for task in assigned_tasks|slice:":5" %}
+                        <div class="list-group-item border-0 border-bottom">
+                            <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0 text-primary">{{ task.title }}</h6>
+                                <span class="badge bg-secondary">{{ task.created_at|date:"M d" }}</span>
+                            </div>
+                            <p class="mb-2 text-muted small">{{ task.description|truncatechars:100 }}</p>
+                            <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i>View Details
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No tasks are currently assigned to you.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Leads Section -->
+    <div class="col-md-6">
+        <div class="card shadow h-100">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-user-friends me-2"></i>Recent Leads
+                    </h5>
+                    <a href="{% url 'lead_management' %}" class="btn btn-sm btn-primary">Manage Leads</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="border-0">Name</th>
+                                <th class="border-0">Contact</th>
+                                <th class="border-0">Status</th>
+                                <th class="border-0">Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lead in leads|slice:":5" %}
+                            <tr>
+                                <td class="align-middle">{{ lead.name }}</td>
+                                <td class="align-middle">
+                                    <a href="tel:{{ lead.contact }}" class="text-decoration-none">
+                                        {{ lead.contact }}
+                                    </a>
+                                </td>
+                                <td class="align-middle">
+                                    {% with status_colors=lead.status|lower %}
+                                        {% if status_colors == 'new' %}
+                                            <span class="badge bg-info text-dark">
+                                        {% elif status_colors == 'pending' %}
+                                            <span class="badge bg-warning text-dark">
+                                        {% elif status_colors == 'converted' %}
+                                            <span class="badge bg-success">
+                                        {% elif status_colors == 'lost' %}
+                                            <span class="badge bg-danger">
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                        {% endif %}
+                                        {{ lead.get_status_display }}
+                                    </span>
+                                    {% endwith %}
+                                </td>
+                                <td class="align-middle">
+                                    <span class="text-muted">{{ lead.updated_at|date:"M d, H:i" }}</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">No leads found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+   
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+<style>
+    /* Custom styles for status badges */
+    .badge {
+        padding: 0.5em 0.8em;
+        font-weight: 500;
+    }
+    
+    /* Brighter colors for status badges */
+    .bg-info {
+        background-color: #0dcaf0 !important;
+    }
+    
+    .bg-warning {
+        background-color: #ffc107 !important;
+    }
+    
+    .bg-success {
+        background-color: #198754 !important;
+    }
+    
+    .bg-danger {
+        background-color: #dc3545 !important;
+    }
+</style>
+{% endblock %}

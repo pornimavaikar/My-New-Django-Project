@@ -1,0 +1,353 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Status Filter Tabs -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <ul class="nav nav-pills" id="statusTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-status="">All Leads</a>
+                        </li>
+                        {% for status, label in status_choices %}
+                        <li class="nav-item">
+                            <a class="nav-link" data-status="{{ status }}">{{ label }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search by name or contact...">
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button id="resetFilters" class="btn btn-secondary">Reset Filters</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leads Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="leadsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Status</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in leads %}
+                                <tr data-lead-id="{{ lead.id }}" data-status="{{ lead.status }}" data-name="{{ lead.name|lower }}" data-contact="{{ lead.contact }}">
+                                    <td>{{ lead.name }}</td>
+                                    <td>
+                                        <a href="tel:{{ lead.contact }}" class="text-decoration-none">
+                                            {{ lead.contact }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm status-select">
+                                            {% for status, label in status_choices %}
+                                            <option value="{{ status }}" {% if lead.status == status %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td class="updated-at">{{ lead.updated_at|date:"M d, Y H:i" }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info view-history">
+                                            <i class="fas fa-history"></i> History
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">No leads found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lead History Modal -->
+<div class="modal fade" id="leadHistoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Lead History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- History content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const resetButton = document.getElementById('resetFilters');
+    const leadsTable = document.getElementById('leadsTable');
+    const tbody = leadsTable.querySelector('tbody');
+    const statusTabs = document.getElementById('statusTabs');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    let currentStatus = '';
+
+    // Function to filter leads
+    function filterLeads() {
+        const searchTerm = searchInput.value.toLowerCase();
+        let visibleLeads = 0;
+        
+        Array.from(tbody.getElementsByTagName('tr')).forEach(row => {
+            if (row.cells.length <= 1) return; // Skip empty state row
+            
+            const name = row.dataset.name;
+            const contact = row.dataset.contact;
+            const status = row.dataset.status;
+            
+            const matchesSearch = !searchTerm || 
+                                name.includes(searchTerm) || 
+                                contact.includes(searchTerm);
+            const matchesStatus = !currentStatus || status === currentStatus;
+            
+            if (matchesSearch && matchesStatus) {
+                row.style.display = '';
+                visibleLeads++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Show no results message if needed
+        updateNoResultsMessage(visibleLeads);
+    }
+
+    // Function to update no results message
+    function updateNoResultsMessage(visibleLeads) {
+        let noResultsRow = tbody.querySelector('.no-results');
+        if (visibleLeads === 0) {
+            if (!noResultsRow) {
+                noResultsRow = document.createElement('tr');
+                noResultsRow.className = 'no-results';
+                noResultsRow.innerHTML = `
+                    <td colspan="5" class="text-center py-4">
+                        <div class="text-muted">
+                            <i class="fas fa-search fa-2x mb-3"></i>
+                            <p>No leads found matching your criteria</p>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(noResultsRow);
+            }
+        } else if (noResultsRow) {
+            noResultsRow.remove();
+        }
+    }
+
+    // Update lead status
+   // Update lead status function
+async function updateLeadStatus(leadId, newStatus, row) {
+    try {
+        const response = await fetch(`/lead/${leadId}/update-status/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ 
+                status: newStatus,
+                notes: '' // Optional notes field
+            })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to update status');
+        }
+
+        // Update the row with new data
+        row.dataset.status = newStatus;
+        row.querySelector('.updated-at').textContent = 
+            new Date(data.updated_at).toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata'
+            });
+
+        showNotification('Status updated successfully', 'success');
+        
+        // Update visibility based on current filter
+        if (currentStatus && newStatus !== currentStatus) {
+            row.style.display = 'none';
+            updateNoResultsMessage(document.querySelectorAll('tr[style=""]').length);
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error updating status:', error);
+        showNotification(error.message, 'error');
+        throw error;  // Re-throw to handle in the calling function
+    }
+}
+
+
+    // Event listeners
+    searchInput.addEventListener('input', filterLeads);
+    
+    resetButton.addEventListener('click', () => {
+        searchInput.value = '';
+        currentStatus = '';
+        statusTabs.querySelectorAll('.nav-link').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        statusTabs.querySelector('[data-status=""]').classList.add('active');
+        filterLeads();
+    });
+
+    statusTabs.addEventListener('click', (e) => {
+        if (e.target.classList.contains('nav-link')) {
+            e.preventDefault();
+            statusTabs.querySelectorAll('.nav-link').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            e.target.classList.add('active');
+            currentStatus = e.target.dataset.status;
+            filterLeads();
+        }
+    });
+
+    // Status change handling
+    document.querySelectorAll('.status-select').forEach(select => {
+    select.addEventListener('change', async function() {
+        const row = this.closest('tr');
+        const leadId = row.dataset.leadId;
+        const newStatus = this.value;
+        const oldStatus = row.dataset.status;
+        
+        try {
+            await updateLeadStatus(leadId, newStatus, row);
+        } catch (error) {
+            console.error('Error updating status:', error);
+            showNotification(error.message, 'error');
+            this.value = oldStatus; // Revert the select to previous value
+        }
+    });
+});
+
+    // View history handling
+    document.querySelectorAll('.view-history').forEach(button => {
+    button.addEventListener('click', async function() {
+        const row = this.closest('tr');
+        const leadId = row.dataset.leadId;
+        const modal = document.getElementById('leadHistoryModal');
+        const modalBody = modal.querySelector('.modal-body');
+
+        try {
+            const response = await fetch(`/lead/${leadId}/history/`);
+            if (!response.ok) throw new Error('Failed to fetch history');
+
+            const data = await response.json();
+            
+            if (data.history.length === 0) {
+                modalBody.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <p>No history available for this lead.</p>
+                    </div>
+                `;
+            } else {
+                modalBody.innerHTML = data.history.map(entry => `
+                    <div class="history-entry border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary">${entry.changed_at}</span>
+                            <span class="text-muted">Updated by: ${entry.changed_by}</span>
+                        </div>
+                        <div class="status-change">
+                            <p class="mb-1">
+                                Status changed from 
+                                <span class="fw-bold text-secondary">${entry.old_status}</span> 
+                                to 
+                                <span class="fw-bold text-primary">${entry.new_status}</span>
+                            </p>
+                            ${entry.remarks ? `
+                                <p class="text-muted small mb-0">
+                                    <i class="fas fa-comment me-1"></i> ${entry.remarks}
+                                </p>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('') || `
+                    <div class="text-center text-muted py-4">
+                        <p>No history available for this lead.</p>
+                    </div>
+                `;
+            }
+
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Failed to load history', 'error');
+        }
+    });
+});
+
+
+    // Notification helper
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+        notification.style.zIndex = '1050';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+});
+</script>
+{% block extra_css %}
+<style>
+    .history-entry:last-child {
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+</style>
+{% endblock %}
+{% endblock %}
