@@ -24,7 +24,7 @@ SECRET_KEY = 'django-insecure-h8y9ti1&yk548@kt6xb*$0(e5z4qxt)p$ytb0=r0vu@(jki2bn
 TIME_ZONE = 'Asia/Kolkata'
 USE_TZ = True
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['*']
 
@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'taskmanager.urls'
@@ -81,15 +82,10 @@ WSGI_APPLICATION = 'taskmanager.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('mydatabase'),
-        'USER': os.getenv('admin'),
-        'PASSWORD': os.getenv('password123'),
-        'HOST': os.getenv('localhost'),
-        'PORT': os.getenv('5432'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
 AUTH_USER_MODEL = 'core.CustomUser'
 
 # Password validation
