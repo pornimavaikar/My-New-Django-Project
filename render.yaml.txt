@@ -19,8 +19,3 @@ services:
         generateValue: true
       - key: DEBUG
         value: false
-
-databases:
-  - name: taskmanager_db
-    databaseName: taskmanager
-    plan: free
