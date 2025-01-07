@@ -3,8 +3,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from functools import wraps
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from .models import Lead
-
+from .models import Lead,CustomUser
 def role_required(*roles):
     def decorator(view_func):
         @wraps(view_func)
@@ -21,22 +20,41 @@ class RoleRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         return self.request.user.role in self.roles_required
 
+# In permissions.py
+
 def get_leads_for_user(user):
     """
-    Helper function to get leads based on user role
-    Args:
-        user: CustomUser instance
-    Returns:
-        QuerySet of leads accessible to the user
+    Get leads based on user role and hierarchy
     """
     if user.role == 'ADMIN':
         return Lead.objects.all()
+    
     elif user.role == 'TL':
-        return Lead.objects.filter(
-            Q(assigned_to__reporting_to=user) | 
-            Q(assigned_to__reporting_to__reporting_to=user)
+        # Get all users reporting to TL (directly or indirectly)
+        team_members = CustomUser.objects.filter(
+            Q(reporting_to=user) |  # Direct reports (SRMs)
+            Q(reporting_to__reporting_to=user)  # Indirect reports (RMs under SRMs)
         )
+        return Lead.objects.filter(
+            Q(assigned_to__in=team_members) |
+            Q(assigned_to=user)
+        )
+    
     elif user.role == 'SRM':
-        return Lead.objects.filter(assigned_to__reporting_to=user)
+        # Get all RMs reporting to SRM and leads assigned to them
+        team_members = CustomUser.objects.filter(
+            Q(reporting_to=user) |  # Direct reports (RMs)
+            Q(id=user.id)  # Include SRM themselves
+        )
+        # Get leads from tasks assigned to the SRM or their team
+        return Lead.objects.filter(
+            Q(assigned_to__in=team_members) |
+            Q(task__assigned_to__in=team_members)
+        ).distinct()
+    
     else:  # RM
-        return Lead.objects.filter(assigned_to=user)
+        # Get leads directly assigned to RM or from tasks assigned to them
+        return Lead.objects.filter(
+            Q(assigned_to=user) |
+            Q(task__assigned_to=user)
+        ).distinct()

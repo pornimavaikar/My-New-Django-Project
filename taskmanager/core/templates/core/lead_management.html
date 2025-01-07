@@ -51,7 +51,8 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Contact</th>
-                                    <th>Status</th>
+                                    <th style="min-width: 200px;">Status</th>
+                                    <th style="min-width: 300px;">Description</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
@@ -66,24 +67,38 @@
                                         </a>
                                     </td>
                                     <td>
-                                        <select class="form-select form-select-sm status-select">
-                                            {% for status, label in status_choices %}
-                                            <option value="{{ status }}" {% if lead.status == status %}selected{% endif %}>
-                                                {{ label }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
+                                        <div class="d-flex flex-column">
+                                            <select class="form-select form-select-sm status-select mb-2">
+                                                {% for status, label in status_choices %}
+                                                <option value="{{ status }}" {% if lead.status == status %}selected{% endif %}>
+                                                    {{ label }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="description-box">
+                                            <textarea class="form-control status-description" rows="2" placeholder="Add status description...">{{ lead.remarks }}</textarea>
+                                        </div>
                                     </td>
                                     <td class="updated-at">{{ lead.updated_at|date:"M d, Y H:i" }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-info view-history">
-                                            <i class="fas fa-history"></i> History
-                                        </button>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-info view-history">
+                                                <i class="fas fa-history"></i> History
+                                            </button>
+                                            {% if user.role == 'ADMIN' or user.role == 'TL' %}
+                                            <button class="btn btn-sm btn-primary view-work-details ms-1">
+                                                <i class="fas fa-tasks"></i> Work Details
+                                            </button>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center py-4">No leads found.</td>
+                                    <td colspan="6" class="text-center py-4">No leads found.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -105,6 +120,39 @@
             </div>
             <div class="modal-body">
                 <!-- History content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Work Details Modal -->
+<div class="modal fade" id="workDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">RM Work Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="work-details-content">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Lead Information</h6>
+                            <div class="lead-details"></div>
+                        </div>
+                    </div>
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Communication History</h6>
+                            <div class="communication-history"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">RM Performance Metrics</h6>
+                            <div class="performance-metrics"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -321,7 +369,110 @@ async function updateLeadStatus(leadId, newStatus, row) {
         }
     });
 });
+document.querySelectorAll('.status-description').forEach(textarea => {
+        textarea.addEventListener('change', async function() {
+            const row = this.closest('tr');
+            const leadId = row.dataset.leadId;
+            const description = this.value;
+            
+            try {
+                const response = await fetch(`/lead/${leadId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        status: row.querySelector('.status-select').value,
+                        notes: description
+                    })
+                });
 
+                if (!response.ok) throw new Error('Failed to update description');
+                
+                showNotification('Description updated successfully', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to update description', 'error');
+            }
+        });
+    });
+
+    // Work Details Modal Handler
+    document.querySelectorAll('.view-work-details').forEach(button => {
+        button.addEventListener('click', async function() {
+            const row = this.closest('tr');
+            const leadId = row.dataset.leadId;
+            const modal = document.getElementById('workDetailsModal');
+            
+            try {
+                const response = await fetch(`/lead/${leadId}/work-details/`);
+                if (!response.ok) throw new Error('Failed to fetch work details');
+
+                const data = await response.json();
+                
+                // Populate lead details
+                modal.querySelector('.lead-details').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>RM Name:</strong> ${data.rm_name}</p>
+                            <p><strong>Lead Status:</strong> ${data.status}</p>
+                            <p><strong>Days in Current Status:</strong> ${data.days_in_status}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Total Interactions:</strong> ${data.total_interactions}</p>
+                            <p><strong>Last Contact:</strong> ${data.last_contacted}</p>
+                            <p><strong>Next Follow-up:</strong> ${data.next_followup}</p>
+                        </div>
+                    </div>
+                `;
+
+                // Populate communication history
+                modal.querySelector('.communication-history').innerHTML = `
+                    <div class="timeline">
+                        ${data.communications.map(comm => `
+                            <div class="timeline-item">
+                                <div class="timeline-date">${comm.date}</div>
+                                <div class="timeline-content">
+                                    <p>${comm.notes}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                // Populate performance metrics
+                modal.querySelector('.performance-metrics').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <h6>Response Time</h6>
+                                <p>${data.metrics.avg_response_time} hours</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <h6>Follow-up Rate</h6>
+                                <p>${data.metrics.followup_rate}%</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <h6>Conversion Rate</h6>
+                                <p>${data.metrics.conversion_rate}%</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to load work details', 'error');
+            }
+        });
+    });
 
     // Notification helper
     function showNotification(message, type) {
@@ -340,6 +491,7 @@ async function updateLeadStatus(leadId, newStatus, row) {
         }, 3000);
     }
 });
+
 </script>
 {% block extra_css %}
 <style>
@@ -347,6 +499,57 @@ async function updateLeadStatus(leadId, newStatus, row) {
         border-bottom: none !important;
         margin-bottom: 0 !important;
         padding-bottom: 0 !important;
+    }
+    .description-box {
+        position: relative;
+    }
+
+    .status-description {
+        font-size: 0.875rem;
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .timeline-item {
+        padding-left: 24px;
+        margin-bottom: 20px;
+        border-left: 2px solid #dee2e6;
+        position: relative;
+    }
+
+    .timeline-date {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .metric-card h6 {
+        color: #6c757d;
+        margin-bottom: 10px;
+    }
+
+    .metric-card p {
+        font-size: 1.25rem;
+        font-weight: 500;
+        margin-bottom: 0;
     }
 </style>
 {% endblock %}

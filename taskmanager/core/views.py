@@ -272,22 +272,25 @@ class ReportView(LoginRequiredMixin, RoleRequiredMixin, View):
 @login_required
 @role_required('ADMIN', 'TL', 'SRM')
 def export_report(request):
-    leads = get_leads_for_user(request.user)
-    
-    # Create response with correct mimetype
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename=leads_report.xlsx'
-    
-    # Create workbook and write to response buffer
-    with openpyxl.Workbook() as wb:
+    try:
+        leads = get_leads_for_user(request.user)
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="leads_report.xlsx"'
+        
+        # Create workbook
+        wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Leads Report"
         
+        # Add headers
         headers = ['Name', 'Contact', 'Status', 'Assigned To', 'Last Updated']
         ws.append(headers)
         
+        # Add data
         for lead in leads:
             ws.append([
                 lead.name,
@@ -297,11 +300,19 @@ def export_report(request):
                 lead.updated_at.strftime('%Y-%m-%d %H:%M')
             ])
         
-        # Save to response buffer
+        # Save workbook
         wb.save(response)
-    
-    return response
-
+        
+        # Make sure the file pointer is at the beginning
+        if hasattr(response, 'seek'):
+            response.seek(0)
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating Excel report: {str(e)}")  # For debugging
+        messages.error(request, "Error generating Excel report. Please try again.")
+        return redirect('reports')
 # views.py
 @login_required
 def lead_dashboard(request):
@@ -685,4 +696,79 @@ def mark_notification_read(request, notification_id):
     """Mark a notification as read"""
     notification = get_object_or_404(Notification, id=notification_id, user=request.user)
     notification.mark_as_read()
-    return JsonResponse({'status': 'success'})
+    return JsonResponse({'status': 'success'})# In views.py
+
+@login_required
+def get_lead_work_details(request, lead_id):
+    try:
+        lead = Lead.objects.select_related('assigned_to').get(id=lead_id)
+        
+        # Check if user has permission to view work details
+        if not (request.user.role in ['ADMIN', 'TL'] or request.user == lead.assigned_to.reporting_to):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        # Get all communications/followups for this lead
+        communications = lead.followups.all().order_by('-created_at')
+        
+        # Calculate metrics
+        total_interactions = communications.count()
+        last_contacted = lead.last_contacted.strftime('%Y-%m-%d %H:%M') if lead.last_contacted else 'Never'
+        next_followup = lead.next_followup_date.strftime('%Y-%m-%d') if lead.next_followup_date else 'Not scheduled'
+        
+        # Calculate days in current status
+        days_in_status = (timezone.now().date() - lead.status_history.latest('changed_at').changed_at.date()).days
+        
+        response_data = {
+            'rm_name': lead.assigned_to.get_full_name() or lead.assigned_to.username,
+            'status': lead.get_status_display(),
+            'days_in_status': days_in_status,
+            'total_interactions': total_interactions,
+            'last_contacted': last_contacted,
+            'next_followup': next_followup,
+            'communications': [{
+                'date': comm.created_at.strftime('%Y-%m-%d %H:%M'),
+                'notes': comm.notes
+            } for comm in communications],
+            'metrics': {
+                'avg_response_time': calculate_avg_response_time(communications),
+                'followup_rate': calculate_followup_rate(communications),
+                'conversion_rate': calculate_conversion_rate(lead)
+            }
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Lead.DoesNotExist:
+        return JsonResponse({'error': 'Lead not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Helper functions for metrics calculation
+def calculate_avg_response_time(communications):
+    if not communications:
+        return 0
+    # Calculate average time between followups
+    response_times = []
+    prev_time = None
+    for comm in communications:
+        if prev_time:
+            diff = (comm.created_at - prev_time).total_seconds() / 3600  # Convert to hours
+            response_times.append(diff)
+        prev_time = comm.created_at
+    return round(sum(response_times) / len(response_times)) if response_times else 0
+
+def calculate_followup_rate(communications):
+    if not communications:
+        return 0
+    # Calculate percentage of followups done within 24 hours of scheduled time
+    on_time_followups = len([c for c in communications if c.is_on_time()])
+    return round((on_time_followups / len(communications)) * 100)
+
+def calculate_conversion_rate(lead):
+    # Calculate conversion rate based on status progression
+    history = lead.status_history.all()
+    if not history:
+        return 0
+    progressed_statuses = len(set(h.new_status for h in history))
+    total_possible_statuses = len(Lead.STATUS_CHOICES)
+    return round((progressed_statuses / total_possible_statuses) * 100)
