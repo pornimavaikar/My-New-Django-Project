@@ -17,29 +17,188 @@
     <!-- User Info Section -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card bg-primary text-white shadow">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h3 class="mb-1">Welcome, {{ user.get_full_name|default:user.username }}</h3>
-                            <p class="mb-0 opacity-75">Role: {{ user.get_role_display }}</p>
-                        </div>
-                        <div class="d-flex gap-2">
-                            {% if user.role != 'RM' %}
-                            <a href="{% url 'task_create' %}" class="btn btn-light">
-                                <i class="fas fa-plus-circle me-2"></i>Create Task
-                            </a>
-                            {% endif %}
-                            
-                        </div>
-                    </div>
+          <div
+            class="card {% if user_role == 'ADMIN' %}bg-dark{% else %}bg-primary{% endif %} text-white shadow"
+          >
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h3 class="mb-1">
+                    Welcome, {{ user.get_full_name|default:user.username }}
+                  </h3>
+                  <p class="mb-0 opacity-75">Role: {{ user.get_role_display }}</p>
                 </div>
+                <div class="d-flex gap-2">
+                  {% if user_role != 'RM' %}
+                  <a href="{% url 'task_create' %}" class="btn btn-light">
+                    <i class="fas fa-plus-circle me-2"></i>Create Task
+                  </a>
+                  {% endif %}
+                </div>
+              </div>
             </div>
+          </div>
         </div>
-    </div>
-<!-- Add this after the User Info Section -->
-<!-- Attendance Section -->
-<div class="row mb-4">
+      </div>
+      {% if user_role == 'ADMIN' %}
+      <!-- Admin Analytics Dashboard -->
+      <div class="row g-4 mb-4">
+          <!-- Key Metrics -->
+          <div class="col-md-3">
+              <div class="card shadow h-100">
+                  <div class="card-body">
+                      <h6 class="text-primary mb-3">
+                          <i class="fas fa-users me-2"></i>User Statistics
+                      </h6>
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                          <span>Total Users</span>
+                          <span class="badge bg-primary">{{ total_users }}</span>
+                      </div>
+                      {% for role in role_distribution %}
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                          <small>{{ role.role }}</small>
+                          <span class="badge bg-secondary">{{ role.count }}</span>
+                      </div>
+                      {% endfor %}
+                  </div>
+              </div>
+          </div>
+  
+          <!-- Lead Statistics -->
+          <div class="col-md-3">
+              <div class="card shadow h-100">
+                  <div class="card-body">
+                      <h6 class="text-primary mb-3">
+                          <i class="fas fa-chart-pie me-2"></i>Lead Statistics
+                      </h6>
+                      {% for status in lead_status_counts %}
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                          <small>{{ status.status }}</small>
+                          <span class="badge bg-info">{{ status.count }}</span>
+                      </div>
+                      {% endfor %}
+                      <div class="mt-3">
+                          <small class="text-muted">Recent Leads (30 days)</small>
+                          <h4 class="mb-0">{{ recent_leads }}</h4>
+                      </div>
+                  </div>
+              </div>
+          </div>
+  
+          <!-- Team Performance -->
+          <div class="col-md-3">
+              <div class="card shadow h-100">
+                  <div class="card-body">
+                      <h6 class="text-primary mb-3">
+                          <i class="fas fa-trophy me-2"></i>Team Performance
+                      </h6>
+                      {% for performance in team_performance %}
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                          <small>{{ performance.role }}</small>
+                          <span class="badge bg-success">{{ performance.completed_leads }}</span>
+                      </div>
+                      {% endfor %}
+                      <div class="mt-3">
+                          <small class="text-muted">Pending Followups</small>
+                          <h4 class="mb-0">{{ pending_followups }}</h4>
+                      </div>
+                  </div>
+              </div>
+          </div>
+  
+          <!-- Attendance Overview -->
+          <div class="col-md-3">
+              <div class="card shadow h-100">
+                  <div class="card-body">
+                      <h6 class="text-primary mb-3">
+                          <i class="fas fa-clock me-2"></i>Today's Attendance
+                      </h6>
+                      <div class="text-center mb-3">
+                          <div class="display-4 mb-0">{{ attendance_percentage }}%</div>
+                          <small class="text-muted">Attendance Rate</small>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-center mt-3">
+                          <small>Total Tasks</small>
+                          <span class="badge bg-primary">{{ total_tasks }}</span>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-center mt-2">
+                          <small>Recent Tasks (30d)</small>
+                          <span class="badge bg-info">{{ recent_tasks }}</span>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+  
+      <!-- Recent Activities and Updates -->
+      <div class="row g-4 mb-4">
+          <!-- Recent Lead Updates -->
+          <div class="col-md-6">
+              <div class="card shadow">
+                  <div class="card-header bg-white">
+                      <h6 class="mb-0 text-primary">
+                          <i class="fas fa-history me-2"></i>Recent Lead Updates
+                      </h6>
+                  </div>
+                  <div class="card-body">
+                      <div class="table-responsive">
+                          <table class="table table-sm">
+                              <thead>
+                                  <tr>
+                                      <th>Lead</th>
+                                      <th>Status Change</th>
+                                      <th>Changed By</th>
+                                      <th>Time</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {% for update in recent_lead_updates %}
+                                  <tr>
+                                      <td>{{ update.lead.name }}</td>
+                                      <td>
+                                          <small class="text-muted">{{ update.old_status }}</small>
+                                          <i class="fas fa-arrow-right mx-1"></i>
+                                          <span class="badge bg-primary">{{ update.new_status }}</span>
+                                      </td>
+                                      <td>{{ update.changed_by.get_full_name }}</td>
+                                      <td>{{ update.get_formatted_changed_at }}</td>
+                                  </tr>
+                                  {% endfor %}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          </div>
+  
+          <!-- Recent Followups -->
+          <div class="col-md-6">
+              <div class="card shadow">
+                  <div class="card-header bg-white">
+                      <h6 class="mb-0 text-primary">
+                          <i class="fas fa-comments me-2"></i>Recent Followups
+                      </h6>
+                  </div>
+                  <div class="card-body">
+                      <div class="list-group list-group-flush">
+                          {% for followup in recent_followups %}
+                          <div class="list-group-item px-0">
+                              <div class="d-flex justify-content-between align-items-center mb-1">
+                                  <strong>{{ followup.lead.name }}</strong>
+                                  <small class="text-muted">{{ followup.created_at|date:"d M, H:i" }}</small>
+                              </div>
+                              <p class="mb-0 small">{{ followup.notes|truncatechars:100 }}</p>
+                              <small class="text-muted">By: {{ followup.created_by.get_full_name }}</small>
+                          </div>
+                          {% endfor %}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+      {% endif %}
+ <!-- Attendance Section -->
+ <div class="row mb-4">
     <div class="col-12">
         <div class="card shadow">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -66,141 +225,114 @@
                 </div>
             </div>
             <div class="card-body">
-                
-<!-- Personal Attendance -->
-<div class="mb-4">
-    <h6 class="text-primary mb-3">Your Attendance</h6>
-    {% if today_attendance %}
-        <div class="d-flex align-items-center">
-            <span class="badge bg-success me-2">
-                <i class="fas fa-check"></i>
-            </span>
-            <div>
-                <p class="mb-0">Check-in: {{ today_attendance.get_formatted_check_in }}</p>
-                {% if today_attendance.check_out %}
-                    <p class="mb-0">Check-out: {{ today_attendance.get_formatted_check_out }}</p>
-                {% endif %}
-                <small class="text-muted">Date: {{ today_attendance.date|date:"d M Y" }}</small>
-                <small class="ms-2 badge bg-{{ today_attendance.status|lower }}">
-                    {{ today_attendance.status }}
-                </small>
-            </div>
-        </div>
-    {% else %}
-        <div class="d-flex align-items-center">
-            <span class="badge bg-warning me-2">
-                <i class="fas fa-exclamation"></i>
-            </span>
-            <p class="mb-0">Attendance not marked for today</p>
-        </div>
-    {% endif %}
-</div>
-                <!-- Seniors Attendance (visible to all except ADMIN) -->
-                {% if user_role != 'ADMIN' and seniors_attendance %}
-                    <div class="mb-4">
-                        <h6 class="text-primary mb-3">Reporting Manager's Attendance</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Role</th>
-                                        <th>Check-in Time</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for attendance in seniors_attendance %}
-                                        <tr>
-                                            <td>{{ attendance.user.get_full_name|default:attendance.user.username }}</td>
-                                            <td>{{ attendance.user.get_role_display }}</td>
-                                            <td>{{ attendance.check_in|date:"H:i:s" }}</td>
-                                            <td>
-                                                <span class="badge bg-{{ attendance.status|lower }}">
-                                                    {{ attendance.status }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                <!-- Personal Attendance -->
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">Your Attendance</h6>
+                    {% if today_attendance %}
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-success me-2">
+                                <i class="fas fa-check"></i>
+                            </span>
+                            <div>
+                                <p class="mb-0">Check-in: {{ today_attendance.get_formatted_check_in }}</p>
+                                {% if today_attendance.check_out %}
+                                    <p class="mb-0">Check-out: {{ today_attendance.get_formatted_check_out }}</p>
+                                {% endif %}
+                                <small class="text-muted">Date: {{ today_attendance.date|date:"d M Y" }}</small>
+                            </div>
                         </div>
-                    </div>
-                {% endif %}
+                    {% else %}
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-warning me-2">
+                                <i class="fas fa-exclamation"></i>
+                            </span>
+                            <p class="mb-0">Attendance not marked for today</p>
+                        </div>
+                    {% endif %}
+                </div>
 
-                <!-- Team Attendance (visible only to seniors) -->
-                {% if is_senior and team_attendance %}
-                    <div class="mb-3">
-                        <h6 class="text-primary mb-3">Team Attendance</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Team Member</th>
-                                        <th>Role</th>
-                                        <th>Check-in Time</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for attendance in team_attendance %}
-                                        <tr>
-                                            <td>{{ attendance.user.get_full_name|default:attendance.user.username }}</td>
-                                            <td>{{ attendance.user.get_role_display }}</td>
-                                            <td>{{ attendance.check_in|date:"H:i:s" }}</td>
-                                            <td>
-                                                <span class="badge bg-{{ attendance.status|lower }}">
-                                                    {{ attendance.status }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <!-- Team Attendance -->
+                {% if team_attendance %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Team Member</th>
+                                <th>Role</th>
+                                <th>Check-in Time</th>
+                                <th>Check-out Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for attendance in team_attendance %}
+                            <tr>
+                                <td>{{ attendance.user.get_full_name|default:attendance.user.username }}</td>
+                                <td>{{ attendance.user.get_role_display }}</td>
+                                <td>{{ attendance.check_in|date:"H:i:s" }}</td>
+                                <td>
+                                    {% if attendance.check_out %}
+                                        {{ attendance.check_out|date:"H:i:s" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if attendance.check_out %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">Present</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
-<div class="row g-4">
     <!-- Assigned Tasks Section -->
-    <div class="col-md-6">
-        <div class="card shadow h-100">
-            <div class="card-header bg-white py-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 text-primary">
-                        <i class="fas fa-tasks me-2"></i>Assigned Tasks
-                    </h5>
-                    <a href="{% url 'task_list' %}" class="btn btn-sm btn-primary">View All</a>
+    <div class="row g-4">
+        <!-- Assigned Tasks -->
+        <div class="col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-primary">
+                            <i class="fas fa-tasks me-2"></i>Assigned Tasks
+                        </h5>
+                        <a href="{% url 'task_list' %}" class="btn btn-sm btn-primary">View All</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if assigned_tasks %}
+                        <div class="list-group">
+                            {% for task in assigned_tasks|slice:":5" %}
+                            <div class="list-group-item border-0 border-bottom">
+                                <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 text-primary">{{ task.title }}</h6>
+                                    <span class="badge bg-secondary">{{ task.created_at|date:"M d" }}</span>
+                                </div>
+                                <p class="mb-2 text-muted small">{{ task.description|truncatechars:100 }}</p>
+                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>View Details
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No tasks are currently assigned to you.</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
-            <div class="card-body">
-                {% if assigned_tasks %}
-                    <div class="list-group">
-                        {% for task in assigned_tasks|slice:":5" %}
-                        <div class="list-group-item border-0 border-bottom">
-                            <div class="d-flex w-100 justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0 text-primary">{{ task.title }}</h6>
-                                <span class="badge bg-secondary">{{ task.created_at|date:"M d" }}</span>
-                            </div>
-                            <p class="mb-2 text-muted small">{{ task.description|truncatechars:100 }}</p>
-                            <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye me-1"></i>View Details
-                            </a>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">No tasks are currently assigned to you.</p>
-                    </div>
-                {% endif %}
-            </div>
         </div>
-    </div>
+
 
     <!-- Recent Leads Section -->
     <div class="col-md-6">

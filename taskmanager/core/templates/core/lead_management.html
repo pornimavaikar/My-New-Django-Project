@@ -51,7 +51,8 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Contact</th>
-                                    <th>Status</th>
+                                    <th style="min-width: 200px;">Status</th>
+                                    <th style="min-width: 300px;">Description</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
@@ -66,24 +67,36 @@
                                         </a>
                                     </td>
                                     <td>
-                                        <select class="form-select form-select-sm status-select">
-                                            {% for status, label in status_choices %}
-                                            <option value="{{ status }}" {% if lead.status == status %}selected{% endif %}>
-                                                {{ label }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
+                                        <div class="d-flex flex-column">
+                                            <select class="form-select form-select-sm status-select mb-2">
+                                                {% for status, label in status_choices %}
+                                                <option value="{{ status }}" {% if lead.status == status %}selected{% endif %}>
+                                                    {{ label }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="description-box">
+                                            <textarea class="form-control status-description" rows="2" placeholder="Add status description...">{{ lead.remarks }}</textarea>
+                                        </div>
                                     </td>
                                     <td class="updated-at">{{ lead.updated_at|date:"M d, Y H:i" }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-info view-history">
-                                            <i class="fas fa-history"></i> History
-                                        </button>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-info view-history">
+                                                <i class="fas fa-history"></i> History
+                                            </button>
+                                            <button class="btn btn-sm btn-success mark-complete ms-1" data-bs-toggle="modal" data-bs-target="#completeLeadModal">
+                                                <i class="fas fa-check"></i> Mark Complete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center py-4">No leads found.</td>
+                                    <td colspan="6" class="text-center py-4">No leads found.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -94,6 +107,7 @@
         </div>
     </div>
 </div>
+
 
 <!-- Lead History Modal -->
 <div class="modal fade" id="leadHistoryModal" tabindex="-1">
@@ -110,183 +124,240 @@
     </div>
 </div>
 
+<div class="modal fade" id="completeLeadModal" tabindex="-1" aria-labelledby="completeLeadModalLabel" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeLeadModalLabel">Complete Lead</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="completeLeadForm">
+                    <div class="mb-3">
+                        <label class="form-label" for="completionStatus">Completion Status</label>
+                        <select class="form-select" name="status" required id="completionStatus">
+                            <optgroup label="Visit Status">
+                                <option value="VISIT_DONE">Visit Done</option>
+                            </optgroup>
+                            <optgroup label="Positive Completion">
+                                <option value="RETAIL">Retail Customer</option>
+                                <option value="COMMERCIAL">Commercial Customer</option>
+                                <option value="BOOKING_DONE">Booking Done</option>
+                            </optgroup>
+                            <optgroup label="Negative Completion">
+                                <option value="NI">Not Interested</option>
+                                <option value="CNC">Could Not Connect</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="visitDetailsSection" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label" for="visitDate">Visit Date</label>
+                            <input type="datetime-local" class="form-control" name="visit_date" id="visitDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="visitLocation">Visit Location</label>
+                            <input type="text" class="form-control" name="visit_location" id="visitLocation">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="completionNotes">Notes</label>
+                        <textarea class="form-control" name="notes" rows="3" required 
+                                id="completionNotes"
+                                placeholder="Add details about the completion/visit..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmComplete">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% csrf_token %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    const resetButton = document.getElementById('resetFilters');
-    const leadsTable = document.getElementById('leadsTable');
-    const tbody = leadsTable.querySelector('tbody');
-    const statusTabs = document.getElementById('statusTabs');
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    let currentStatus = '';
-
-    // Function to filter leads
-    function filterLeads() {
-        const searchTerm = searchInput.value.toLowerCase();
-        let visibleLeads = 0;
-        
-        Array.from(tbody.getElementsByTagName('tr')).forEach(row => {
-            if (row.cells.length <= 1) return; // Skip empty state row
-            
-            const name = row.dataset.name;
-            const contact = row.dataset.contact;
-            const status = row.dataset.status;
-            
-            const matchesSearch = !searchTerm || 
-                                name.includes(searchTerm) || 
-                                contact.includes(searchTerm);
-            const matchesStatus = !currentStatus || status === currentStatus;
-            
-            if (matchesSearch && matchesStatus) {
-                row.style.display = '';
-                visibleLeads++;
-            } else {
-                row.style.display = 'none';
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const searchInput = document.getElementById('searchInput');
+        const resetButton = document.getElementById('resetFilters');
+        const leadsTable = document.getElementById('leadsTable');
+        const tbody = leadsTable.querySelector('tbody');
+        const statusTabs = document.getElementById('statusTabs');
+        let currentStatus = '';
+        let currentLeadId = null;
+    
+        // Function to update no results message
+        function updateNoResultsMessage(visibleCount) {
+            const existingNoResults = tbody.querySelector('.no-results');
+            if (existingNoResults) {
+                existingNoResults.remove();
             }
-        });
-
-        // Show no results message if needed
-        updateNoResultsMessage(visibleLeads);
-    }
-
-    // Function to update no results message
-    function updateNoResultsMessage(visibleLeads) {
-        let noResultsRow = tbody.querySelector('.no-results');
-        if (visibleLeads === 0) {
-            if (!noResultsRow) {
-                noResultsRow = document.createElement('tr');
+            
+            if (visibleCount === 0) {
+                const noResultsRow = document.createElement('tr');
                 noResultsRow.className = 'no-results';
                 noResultsRow.innerHTML = `
-                    <td colspan="5" class="text-center py-4">
-                        <div class="text-muted">
-                            <i class="fas fa-search fa-2x mb-3"></i>
-                            <p>No leads found matching your criteria</p>
-                        </div>
+                    <td colspan="6" class="text-center py-4">
+                        No leads found matching your criteria.
                     </td>
                 `;
                 tbody.appendChild(noResultsRow);
             }
-        } else if (noResultsRow) {
-            noResultsRow.remove();
         }
-    }
-
-    // Update lead status
-   // Update lead status function
-async function updateLeadStatus(leadId, newStatus, row) {
-    try {
-        const response = await fetch(`/lead/${leadId}/update-status/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ 
-                status: newStatus,
-                notes: '' // Optional notes field
-            })
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to update status');
-        }
-
-        // Update the row with new data
-        row.dataset.status = newStatus;
-        row.querySelector('.updated-at').textContent = 
-            new Date(data.updated_at).toLocaleString('en-IN', {
-                timeZone: 'Asia/Kolkata'
-            });
-
-        showNotification('Status updated successfully', 'success');
-        
-        // Update visibility based on current filter
-        if (currentStatus && newStatus !== currentStatus) {
-            row.style.display = 'none';
-            updateNoResultsMessage(document.querySelectorAll('tr[style=""]').length);
-        }
-
-        return data;
-    } catch (error) {
-        console.error('Error updating status:', error);
-        showNotification(error.message, 'error');
-        throw error;  // Re-throw to handle in the calling function
-    }
-}
-
-
-    // Event listeners
-    searchInput.addEventListener('input', filterLeads);
     
-    resetButton.addEventListener('click', () => {
-        searchInput.value = '';
-        currentStatus = '';
-        statusTabs.querySelectorAll('.nav-link').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        statusTabs.querySelector('[data-status=""]').classList.add('active');
-        filterLeads();
-    });
-
-    statusTabs.addEventListener('click', (e) => {
-        if (e.target.classList.contains('nav-link')) {
-            e.preventDefault();
-            statusTabs.querySelectorAll('.nav-link').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            e.target.classList.add('active');
-            currentStatus = e.target.dataset.status;
-            filterLeads();
-        }
-    });
-
-    // Status change handling
-    document.querySelectorAll('.status-select').forEach(select => {
-    select.addEventListener('change', async function() {
-        const row = this.closest('tr');
-        const leadId = row.dataset.leadId;
-        const newStatus = this.value;
-        const oldStatus = row.dataset.status;
-        
-        try {
-            await updateLeadStatus(leadId, newStatus, row);
-        } catch (error) {
-            console.error('Error updating status:', error);
-            showNotification(error.message, 'error');
-            this.value = oldStatus; // Revert the select to previous value
-        }
-    });
-});
-
-    // View history handling
-    document.querySelectorAll('.view-history').forEach(button => {
-    button.addEventListener('click', async function() {
-        const row = this.closest('tr');
-        const leadId = row.dataset.leadId;
-        const modal = document.getElementById('leadHistoryModal');
-        const modalBody = modal.querySelector('.modal-body');
-
-        try {
-            const response = await fetch(`/lead/${leadId}/history/`);
-            if (!response.ok) throw new Error('Failed to fetch history');
-
-            const data = await response.json();
+        // Function to filter leads
+        function filterLeads() {
+            const searchTerm = searchInput.value.toLowerCase();
+            let visibleLeads = 0;
             
-            if (data.history.length === 0) {
-                modalBody.innerHTML = `
-                    <div class="text-center text-muted py-4">
-                        <p>No history available for this lead.</p>
-                    </div>
-                `;
-            } else {
-                modalBody.innerHTML = data.history.map(entry => `
+            Array.from(tbody.getElementsByTagName('tr')).forEach(row => {
+                if (row.cells.length <= 1) return; // Skip empty state row
+                
+                const name = row.dataset.name;
+                const contact = row.dataset.contact;
+                const status = row.dataset.status;
+                
+                // Check if the lead is completed based on status
+                const isCompleted = ['RETAIL', 'COMMERCIAL', 'BOOKING_DONE', 'NI', 'CNC'].includes(status);
+                
+                const matchesSearch = !searchTerm || 
+                                    name.includes(searchTerm) || 
+                                    contact.includes(searchTerm);
+                const matchesStatus = !currentStatus || status === currentStatus;
+                
+                // Hide the row if it's completed OR doesn't match filters
+                if (isCompleted || !matchesSearch || !matchesStatus) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                    visibleLeads++;
+                }
+            });
+    
+            updateNoResultsMessage(visibleLeads);
+        }
+    
+        // Function to show notifications
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+            notification.style.zIndex = '1050';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+    
+        // Function to load completed leads
+       
+        // Function to update lead status
+        async function updateLeadStatus(leadId, newStatus, row) {
+            const requestBody = {
+                status: newStatus,
+                notes: row.querySelector('.status-description').value || ''
+            };
+    
+            try {
+                const response = await fetch(`/lead/${leadId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+    
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update status');
+                }
+    
+                // Update UI after successful response
+                if (['RETAIL', 'COMMERCIAL', 'BOOKING_DONE', 'NI', 'CNC'].includes(newStatus)) {
+                    row.remove();
+                    
+                    updateNoResultsMessage(document.querySelectorAll('#leadsTable tbody tr:not(.no-results)').length);
+                } else {
+                    // Update the row with new data
+                    row.dataset.status = newStatus;
+                    row.querySelector('.updated-at').textContent = 
+                        new Date(data.updated_at).toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata'
+                        });
+                }
+    
+                showNotification('Status updated successfully', 'success');
+                return data;
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showNotification(error.message, 'error');
+                throw error;
+            }
+        }
+    
+        // Function to update completed leads table
+        
+    
+        // Function to get status badge HTML
+        function getStatusBadge(status) {
+            const colors = {
+                'RETAIL': 'success',
+                'COMMERCIAL': 'success',
+                'BOOKING_DONE': 'success',
+                'NI': 'warning',
+                'CNC': 'danger',
+                'VISIT_DONE': 'info'
+            };
+            return `<span class="badge bg-${colors[status] || 'secondary'}">${status}</span>`;
+        }
+    
+        // Function to handle lead history
+        function attachHistoryViewListeners() {
+            document.querySelectorAll('.view-history').forEach(button => {
+                // Get the lead ID from the parent row instead of the button
+                const leadId = button.closest('tr').dataset.leadId;
+                // Set the data-lead-id attribute on the button
+                button.dataset.leadId = leadId;
+                
+                button.addEventListener('click', () => {
+                    if (leadId) {
+                        viewLeadHistory(leadId);
+                    } else {
+                        showNotification('Error: Lead ID not found', 'error');
+                    }
+                });
+            });
+        }
+    
+        // Function to view lead history with error handling
+        async function viewLeadHistory(leadId) {
+            try {
+                if (!leadId) {
+                    throw new Error('Invalid lead ID');
+                }
+    
+                const response = await fetch(`/lead/${leadId}/history/`);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Failed to fetch history (Status: ${response.status})`);
+                }
+    
+                const data = await response.json();
+                const modalBody = document.querySelector('#leadHistoryModal .modal-body');
+                
+                modalBody.innerHTML = data.history.length ? data.history.map(entry => `
                     <div class="history-entry border-bottom pb-3 mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="badge bg-primary">${entry.changed_at}</span>
@@ -306,40 +377,209 @@ async function updateLeadStatus(leadId, newStatus, row) {
                             ` : ''}
                         </div>
                     </div>
-                `).join('') || `
-                    <div class="text-center text-muted py-4">
-                        <p>No history available for this lead.</p>
-                    </div>
-                `;
+                `).join('') : '<p class="text-center text-muted py-4">No history available for this lead.</p>';
+    
+                const historyModal = new bootstrap.Modal(document.getElementById('leadHistoryModal'));
+                historyModal.show();
+            } catch (error) {
+                console.error('Error fetching lead history:', error);
+                showNotification(error.message || 'Failed to load history', 'error');
             }
-
-            const bsModal = new bootstrap.Modal(modal);
-            bsModal.show();
-        } catch (error) {
-            console.error('Error:', error);
-            showNotification('Failed to load history', 'error');
         }
-    });
-});
-
-
-    // Notification helper
-    function showNotification(message, type) {
-        const notification = document.createElement('div');
-        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
-        notification.style.zIndex = '1050';
-        notification.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(notification);
+    
+        // Update the button creation in the table rows
+        document.querySelectorAll('tr[data-lead-id]').forEach(row => {
+            const leadId = row.dataset.leadId;
+            const historyButton = row.querySelector('.view-history');
+            if (historyButton) {
+                historyButton.dataset.leadId = leadId;
+            }
+        });
+    
+    
+        // Status change handling
+        document.querySelectorAll('.status-select').forEach(select => {
+            select.addEventListener('change', async function() {
+                const row = this.closest('tr');
+                const leadId = row.dataset.leadId;
+                const newStatus = this.value;
+                const oldStatus = row.dataset.status;
+                
+                try {
+                    await updateLeadStatus(leadId, newStatus, row);
+                } catch (error) {
+                    this.value = oldStatus; // Revert the select to previous value
+                }
+            });
+        });
+    
+        // Description update handling
+        document.querySelectorAll('.status-description').forEach(textarea => {
+            textarea.addEventListener('change', async function() {
+                const row = this.closest('tr');
+                const leadId = row.dataset.leadId;
+                const description = this.value;
+                
+                try {
+                    const response = await fetch(`/lead/${leadId}/update-status/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            status: row.querySelector('.status-select').value,
+                            notes: description
+                        })
+                    });
+    
+                    if (!response.ok) throw new Error('Failed to update description');
+                    
+                    showNotification('Description updated successfully', 'success');
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Failed to update description', 'error');
+                }
+            });
+        });
+    
+        // Status tab handling
+        statusTabs.querySelectorAll('.nav-link').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                statusTabs.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                currentStatus = this.dataset.status;
+                filterLeads();
+            });
+        });
+    
+        // Mark complete button handling
+        document.querySelectorAll('.mark-complete').forEach(button => {
+            button.addEventListener('click', function() {
+                const row = this.closest('tr');
+                currentLeadId = row.dataset.leadId;
+                
+                // Reset form
+                document.getElementById('completeLeadForm').reset();
+                
+                // Pre-fill data
+                const currentRemarks = row.querySelector('.status-description').value;
+                document.querySelector('#completeLeadForm textarea[name="notes"]').value = currentRemarks;
+            });
+        });
+    
+        // Completion status change handling
+        document.getElementById('completionStatus').addEventListener('change', function() {
+            const visitDetailsSection = document.getElementById('visitDetailsSection');
+            visitDetailsSection.style.display = this.value === 'VISIT_DONE' ? 'block' : 'none';
+        });
+    
+        // Confirm complete button handling
+        document.getElementById('confirmComplete').addEventListener('click', async function() {
+            const form = document.getElementById('completeLeadForm');
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch(`/lead/${currentLeadId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        status: formData.get('status'),
+                        notes: formData.get('notes'),
+                        visit_date: formData.get('visit_date'),
+                        visit_location: formData.get('visit_location')
+                    })
+                });
+    
+                if (!response.ok) throw new Error('Failed to complete lead');
+    
+                const data = await response.json();
+                const row = document.querySelector(`tr[data-lead-id="${currentLeadId}"]`);
+                if (row) {
+                    row.remove();
+                    updateNoResultsMessage(document.querySelectorAll('#leadsTable tbody tr:not(.no-results)').length);
+                }
+                
+               
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('completeLeadModal'));
+                modal.hide();
+                
+                showNotification('Lead completed successfully', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Failed to complete lead', 'error');
+            }
+        });
+    
+        // Initial setup
         
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-});
+        filterLeads();
+        attachHistoryViewListeners();
+    
+        // Search input handling
+        searchInput.addEventListener('input', filterLeads);
+        
+        // Reset button handling
+        resetButton.addEventListener('click', () => {
+            searchInput.value = '';
+            currentStatus = '';
+            statusTabs.querySelectorAll('.nav-link').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            statusTabs.querySelector('[data-status=""]').classList.add('active');
+            filterLeads();
+        });
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        const completeLeadModal = document.getElementById('completeLeadModal');
+        const firstFocusableElement = completeLeadModal.querySelector('select');
+        let previousActiveElement = null;
+    
+        // Store the element that had focus before opening modal
+        completeLeadModal.addEventListener('show.bs.modal', function() {
+            previousActiveElement = document.activeElement;
+        });
+    
+        // Handle focus when modal opens
+        completeLeadModal.addEventListener('shown.bs.modal', function() {
+            firstFocusableElement.focus();
+        });
+    
+        // Restore focus when modal closes
+        completeLeadModal.addEventListener('hidden.bs.modal', function() {
+            if (previousActiveElement) {
+                previousActiveElement.focus();
+            }
+        });
+    
+        // Trap focus within modal
+        completeLeadModal.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                const focusableElements = completeLeadModal.querySelectorAll(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                );
+                const firstElement = focusableElements[0];
+                const lastElement = focusableElements[focusableElements.length - 1];
+    
+                if (e.shiftKey) {
+                    if (document.activeElement === firstElement) {
+                        e.preventDefault();
+                        lastElement.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastElement) {
+                        e.preventDefault();
+                        firstElement.focus();
+                    }
+                }
+            }
+        });
+    });
 </script>
 {% block extra_css %}
 <style>
@@ -347,6 +587,58 @@ async function updateLeadStatus(leadId, newStatus, row) {
         border-bottom: none !important;
         margin-bottom: 0 !important;
         padding-bottom: 0 !important;
+    }
+    .description-box {
+        position: relative;
+    }
+
+    .status-description {
+        font-size: 0.875rem;
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .timeline-item {
+        padding-left: 24px;
+        margin-bottom: 20px;
+        border-left: 2px solid #dee2e6;
+        position: relative;
+    }
+
+    .timeline-date {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .metric-card h6 {
+        color: #6c757d;
+        margin-bottom: 10px;
+    }
+    
+
+    .metric-card p {
+        font-size: 1.25rem;
+        font-weight: 500;
+        margin-bottom: 0;
     }
 </style>
 {% endblock %}

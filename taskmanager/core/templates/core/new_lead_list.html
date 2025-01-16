@@ -1,0 +1,200 @@
+{% extends "core/base.html" %} {% block content %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Completed Leads</h5>
+        <div class="small text-muted mt-1" id="leadStats">
+          Loading statistics...
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover" id="completedLeadsTable">
+            <thead>
+              <tr>
+                <th>Lead ID</th>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th>Completion</th>
+                <th>Assigned To</th>
+                <th>Completed By</th>
+                <th>Completed At</th>
+                <th>Task</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leadsTableBody">
+              {% for lead in completed_leads %}
+              <tr>
+                <td>{{ lead.id }}</td>
+                <td>{{ lead.name }}</td>
+                <td>{{ lead.contact }}</td>
+                <td>
+                  <span
+                    class="badge {% if lead.status in positive_statuses %}bg-success{% else %}bg-warning{% endif %}"
+                  >
+                    {{ lead.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  {% if lead.status in positive_statuses %}Positive{% else
+                  %}Negative{% endif %}
+                </td>
+                <td>{{ lead.assigned_to_info|default:"Unassigned" }}</td>
+                <td>{{ lead.completed_by_info|default:"" }}</td>
+                <td>{{ lead.completed_at|date:"d-m-Y H:i A" }}</td>
+                <td>task</td>
+                <td>
+                  <div class="btn-group">
+                    <button class="btn btn-info btn-sm">History</button>
+                    {% if lead.task %}
+                    <button class="btn btn-primary btn-sm">Notes</button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Lead Status History</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div id="historyContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    function loadCompletedLeads() {
+      fetch("/get-completed-leads/") // Update this URL to match your URL configuration
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.status === "success") {
+            // Update statistics
+            const statsHtml = `Total: ${data.total_count} (Positive: ${data.positive_count}, Negative: ${data.negative_count})`;
+            document.getElementById("leadStats").textContent = statsHtml;
+
+            // Update table
+            const tableBody = document.getElementById("leadsTableBody");
+            tableBody.innerHTML = "";
+
+            data.leads.forEach((lead) => {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+              <td>${lead.id}</td>
+              <td>${lead.name}</td>
+              <td>${lead.contact}</td>
+              <td>
+                <span class="badge ${
+                  lead.completion_type === "Positive"
+                    ? "bg-success"
+                    : "bg-warning"
+                }">
+                  ${lead.status}
+                </span>
+              </td>
+              <td>${lead.completion_type}</td>
+              <td>${lead.assigned_to_info || "Unassigned"}</td>
+              <td>${lead.completed_by_info || ""}</td>
+              <td>${lead.completed_at}</td>
+              <td>${lead.task_name}</td>
+              <td>
+                ${
+                  lead.remarks
+                    ? `<button class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" title="${lead.remarks}">
+                    <i class="fas fa-comment"></i>
+                  </button>`
+                    : ""
+                }
+              </td>
+              <td>
+                <button class="btn btn-sm btn-info view-history" data-lead-id="${
+                  lead.id
+                }" 
+                        data-history='${JSON.stringify(
+                          lead.last_status_change
+                        )}'>
+                  <i class="fas fa-history"></i> History
+                </button>
+              </td>
+            `;
+              tableBody.appendChild(row);
+            });
+
+            // Initialize tooltips
+            const tooltipTriggerList = [].slice.call(
+              document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            );
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+              return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+
+            // Add history button listeners
+            document.querySelectorAll(".view-history").forEach((button) => {
+              button.addEventListener("click", function () {
+                const historyData = JSON.parse(
+                  this.getAttribute("data-history")
+                );
+                if (historyData) {
+                  const historyHtml = `
+                  <div class="mb-3">
+                    <strong>From Status:</strong> ${historyData.from_status}<br>
+                    <strong>To Status:</strong> ${historyData.to_status}<br>
+                    <strong>Changed By:</strong> ${historyData.changed_by}<br>
+                    <strong>Changed At:</strong> ${historyData.changed_at}<br>
+                    ${
+                      historyData.remarks
+                        ? `<strong>Remarks:</strong> ${historyData.remarks}`
+                        : ""
+                    }
+                  </div>
+                `;
+                  document.getElementById("historyContent").innerHTML =
+                    historyHtml;
+                  new bootstrap.Modal(
+                    document.getElementById("historyModal")
+                  ).show();
+                }
+              });
+            });
+          } else {
+            console.error("Failed to load leads:", data.error);
+          }
+        })
+        .catch((error) => {
+          console.error("Error loading leads:", error);
+          document.getElementById("leadsTableBody").innerHTML = `
+          <tr><td colspan="11" class="text-center text-danger">Error loading leads. Please try again.</td></tr>
+        `;
+        });
+    }
+
+    // Load leads when page loads
+    loadCompletedLeads();
+
+    // Optional: Add refresh button or auto-refresh
+    // setInterval(loadCompletedLeads, 60000); // Refresh every minute
+  });
+</script>
+{% endblock %}

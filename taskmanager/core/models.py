@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 import pytz
-
+from django.db.models import Q
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('ADMIN', 'Supreme ID'),
@@ -44,31 +44,67 @@ class CustomUser(AbstractUser):
         return Lead.objects.filter(assigned_to=self)
     
     def has_lead_access(self, lead):
-        """
-        Check if user has access to modify the lead based on role hierarchy
-        """
-        # Admin has access to all leads
+    
+    # Admin has access to all leads
         if self.role == 'ADMIN':
-            return True
-            
-        # TL has access to their own leads and leads assigned to their team
+         return True
+        
+    # TL has access to their own leads, leads assigned to their team,
+    # and leads from tasks created by/assigned to their team
         if self.role == 'TL':
-            return (lead.assigned_to == self or 
-                    lead.assigned_to.reporting_to == self)
-                    
-        # SRM has access to their own leads and leads assigned to their RMs
+         team_members = CustomUser.objects.filter(
+            Q(reporting_to=self) |
+            Q(reporting_to__reporting_to=self)
+         )
+         return (lead.assigned_to == self or
+                lead.assigned_to.reporting_to == self or
+                lead.task.assigned_by in team_members or
+                lead.task.assigned_to in team_members)
+        
+    # SRM has access to their own leads, leads assigned to their RMs,
+    # and leads from tasks created by/assigned to them or their RMs
         if self.role == 'SRM':
-            return (lead.assigned_to == self or 
-                    lead.assigned_to.reporting_to == self)
-                    
-        # RM only has access to their own leads
+          team_members = CustomUser.objects.filter(
+            Q(reporting_to=self) |
+            Q(id=self.id)
+         )
+          return (lead.assigned_to == self or
+                lead.assigned_to.reporting_to == self or
+                lead.task.assigned_by == self or
+                lead.task.assigned_to in team_members)
+        
+    # RM only has access to their own leads and leads from their tasks
         if self.role == 'RM':
-            return lead.assigned_to == self
-            
+            return (lead.assigned_to == self or
+                lead.task.assigned_to == self)
+        
         return False
+    def is_admin(self):
+        return self.role == 'ADMIN' or self.is_superuser
+
+    def is_tl(self):
+        return self.role == 'TL'
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
-
+    def can_view_reports(self):
+        """Explicit check for report viewing permission"""
+        return self.role in ['ADMIN', 'TL']
+    
+    def can_view_lead_list(self):
+        """Explicit check for lead list viewing permission"""
+        return self.role in ['ADMIN', 'TL', 'SRM']
+    
+    def get_team_hierarchy(self):
+        """Get all users in the team hierarchy"""
+        if self.role == 'TL':
+            direct_reports = self.reporting_users.all()  # SRMs
+            indirect_reports = CustomUser.objects.filter(
+                reporting_to__in=direct_reports
+            )  # RMs under SRMs
+            return (direct_reports | indirect_reports).distinct()
+        elif self.role == 'SRM':
+            return self.reporting_users.all()  # RMs
+        return CustomUser.objects.none()
 class Task(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -111,8 +147,19 @@ class Lead(models.Model):
         related_name='completed_leads'
     )
     
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+        
+    def get_formatted_changed_at(self):
+        return self.changed_at.strftime('%d-%m-%Y %I:%M %p')
     class Meta:
-        ordering = ['-created_at']  # Order by most recent by default
+        ordering = ['-created_at']
+    class Meta:
+        indexes = [
+            models.Index(fields=['assigned_to']),
+            models.Index(fields=['task']),
+            models.Index(fields=['status']),
+        ]# Order by most recent by default
 class Attendance(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     date = models.DateField(auto_now_add=True)
@@ -189,3 +236,4 @@ class Notification(models.Model):
         
     def __str__(self):
         return f"{self.title} - {self.user.username}"
+    
