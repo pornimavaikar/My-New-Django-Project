@@ -1,0 +1,196 @@
+<div class="lead-details p-3">
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <h6 class="text-muted mb-2">Basic Information</h6>
+      <dl class="row">
+        <dt class="col-sm-4">Name</dt>
+        <dd class="col-sm-8">{{ lead.name }}</dd>
+
+        <dt class="col-sm-4">Contact</dt>
+        <dd class="col-sm-8">
+          <a href="tel:{{ lead.contact }}">{{ lead.contact }}</a>
+        </dd>
+
+        <dt class="col-sm-4">Status</dt>
+        <dd class="col-sm-8">
+          <span class="badge bg-{{ lead.status|lower }}-subtle">
+            {{ lead.get_status_display }}
+          </span>
+        </dd>
+
+        <dt class="col-sm-4">Created</dt>
+        <dd class="col-sm-8">{{ lead.created_at|date:"M d, Y H:i" }}</dd>
+      </dl>
+    </div>
+    <div class="col-md-6">
+      <h6 class="text-muted mb-2">Additional Details</h6>
+      <dl class="row">
+        <dt class="col-sm-4">Source</dt>
+        <dd class="col-sm-8">{{ lead.source|default:"N/A" }}</dd>
+
+        <dt class="col-sm-4">Next Followup</dt>
+        <dd data-field="next-followup">{{ lead.next_followup_date }}</dd>
+
+        <dt class="col-sm-4">Last Contact</dt>
+        <dd class="col-sm-8">
+          {% if lead.last_contacted %} {{ lead.last_contacted|date:"M d, Y H:i"
+          }} {% else %} Never contacted {% endif %}
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  {% if lead.remarks %}
+  <div class="remarks mb-4">
+    <h6 class="text-muted mb-2">Remarks</h6>
+    <p class="bg-light p-3 rounded">{{ lead.remarks }}</p>
+  </div>
+  {% endif %}
+
+  <div class="followups mb-4">
+    <h6 class="text-muted mb-2">Followup History</h6>
+    {% if followups %}
+    <div class="list-group">
+      {% for followup in followups %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-center">
+          <small class="text-muted"
+            >{{ followup.created_at|date:"M d, Y H:i" }}</small
+          >
+          <small class="text-muted"
+            >by {{ followup.created_by.get_full_name }}</small
+          >
+        </div>
+        <p class="mb-0 mt-2">{{ followup.notes }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No followups recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="add-followup">
+    <h6 class="text-muted mb-2">Add Followup</h6>
+    <form method="post" action="{% url 'lead_detail' lead.id %}">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="id_notes" class="form-label">Notes</label>
+        {{ form.notes }}
+      </div>
+      <div class="mb-3">
+        <label for="id_followup_date" class="form-label"
+          >Next Followup Date</label
+        >
+        {{ form.followup_date }}
+      </div>
+      <button type="submit" class="btn btn-primary">Add Followup</button>
+    </form>
+  </div>
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const followupForm = document.querySelector(".add-followup form");
+
+    if (followupForm) {
+      followupForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")
+              .value,
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.status === "success") {
+              // Update the next followup date in Additional Details section
+              const nextFollowupEl = document.querySelector(
+                '[data-field="next-followup"]'
+              );
+              if (nextFollowupEl) {
+                nextFollowupEl.textContent =
+                  data.lead_details.next_followup_date;
+              }
+
+              // Add new followup to the history list
+              const followupsList = document.querySelector(
+                ".followups .list-group"
+              );
+              if (followupsList) {
+                const newFollowup = document.createElement("div");
+                newFollowup.className = "list-group-item";
+                newFollowup.innerHTML = `
+                  <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">${data.followup.created_at}</small>
+                    <small class="text-muted">by ${data.followup.created_by}</small>
+                  </div>
+                  <p class="mb-0 mt-2">${data.followup.notes}</p>
+                `;
+
+                // If there's no followups yet, clear the "No followups" message
+                const noFollowups = document.querySelector(
+                  ".followups p.text-muted"
+                );
+                if (noFollowups) {
+                  noFollowups.remove();
+                }
+
+                // Create list-group if it doesn't exist
+                if (!followupsList) {
+                  const newList = document.createElement("div");
+                  newList.className = "list-group";
+                  document.querySelector(".followups").appendChild(newList);
+                  newList.appendChild(newFollowup);
+                } else {
+                  followupsList.insertBefore(
+                    newFollowup,
+                    followupsList.firstChild
+                  );
+                }
+              }
+
+              // Reset the form
+              followupForm.reset();
+
+              // Show success message
+              const alert = document.createElement("div");
+              alert.className =
+                "alert alert-success alert-dismissible fade show mt-3";
+              alert.innerHTML = `
+                Follow-up added successfully
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              `;
+              followupForm.insertAdjacentElement("beforebegin", alert);
+
+              // Remove the alert after 3 seconds
+              setTimeout(() => {
+                alert.remove();
+              }, 3000);
+            }
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            const alert = document.createElement("div");
+            alert.className =
+              "alert alert-danger alert-dismissible fade show mt-3";
+            alert.innerHTML = `
+              Failed to add follow-up. Please try again.
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            followupForm.insertAdjacentElement("beforebegin", alert);
+
+            setTimeout(() => {
+              alert.remove();
+            }, 3000);
+          });
+      });
+    }
+  });
+</script>

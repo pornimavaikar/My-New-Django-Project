@@ -10,3 +10,7 @@ def has_role(user, roles):
     if isinstance(roles, str):
         roles = [r.strip() for r in roles.split(',')]
     return user.role in roles
+
+@register.filter
+def split(value, separator):
+    return value.split(separator)

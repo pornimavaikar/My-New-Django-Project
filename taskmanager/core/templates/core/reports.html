@@ -1,0 +1,202 @@
+{% extends 'core/base.html' %} {% block content %}
+
+<div class="container-fluid py-4">
+  <!-- Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">Total Leads</h5>
+          <h2 class="mb-0">{{ total_leads }}</h2>
+          <small>Across all stages</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h5 class="card-title">Converted Leads</h5>
+          <h2 class="mb-0">{{ converted_leads }}</h2>
+          <small>BOOKING_DONE, RETAIL, COMMERCIAL</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-white">
+        <div class="card-body">
+          <h5 class="card-title">Active Leads</h5>
+          <h2 class="mb-0">{{ active_leads }}</h2>
+          <small>In progress</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body">
+          <h5 class="card-title">Lost Leads</h5>
+          <h2 class="mb-0">{{ lost_leads }}</h2>
+          <small>NI, CNC</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Performance -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Team Performance</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>RM Name</th>
+                  <th>Total Leads</th>
+                  <th>Active Leads</th>
+                  <th>Converted</th>
+                  <th>Lost</th>
+                  <th>Conversion Rate</th>
+                  <th>Avg Response Time</th>
+                  <th>Last Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for performance in team_performance %}
+                <tr>
+                  <td>{{ performance.name }}</td>
+                  <td>{{ performance.total_leads }}</td>
+                  <td>{{ performance.active_leads }}</td>
+                  <td>{{ performance.converted_leads }}</td>
+                  <td>{{ performance.lost_leads }}</td>
+                  <td>{{ performance.conversion_rate }}%</td>
+                  <td>{{ performance.avg_response_time }} hrs</td>
+                  <td>{{ performance.last_active }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Distribution -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Lead Status Distribution</h5>
+        </div>
+        <div class="card-body">
+          <canvas id="statusChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Daily Lead Updates</h5>
+        </div>
+        <div class="card-body">
+          <canvas id="updatesChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Activities -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div
+          class="card-header d-flex justify-content-between align-items-center"
+        >
+          <h5 class="card-title mb-0">Recent Activities</h5>
+          <button class="btn btn-primary" onclick="exportActivities()">
+            Export
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>RM</th>
+                  <th>Lead</th>
+                  <th>Action</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for activity in recent_activities %}
+                <tr>
+                  <td>{{ activity.timestamp }}</td>
+                  <td>{{ activity.rm_name }}</td>
+                  <td>{{ activity.lead_name }}</td>
+                  <td>{{ activity.action }}</td>
+                  <td>{{ activity.details }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Status Distribution Chart
+  const statusCtx = document.getElementById('statusChart').getContext('2d');
+  new Chart(statusCtx, {
+      type: 'doughnut',
+      data: {
+          labels: {{ status_labels|safe }},
+          datasets: [{
+              data: {{ status_data|safe }},
+              backgroundColor: [
+                  '#0d6efd',
+                  '#198754',
+                  '#ffc107',
+                  '#dc3545',
+                  '#6c757d'
+              ]
+          }]
+      }
+  });
+
+  // Daily Updates Chart
+  const updatesCtx = document.getElementById('updatesChart').getContext('2d');
+  new Chart(updatesCtx, {
+      type: 'line',
+      data: {
+          labels: {{ daily_labels|safe }},
+          datasets: [{
+              label: 'Lead Updates',
+              data: {{ daily_data|safe }},
+              borderColor: '#0d6efd',
+              tension: 0.1
+          }]
+      },
+      options: {
+          scales: {
+              y: {
+                  beginAtZero: true
+              }
+          }
+      }
+  });
+
+  function exportActivities() {
+      window.location.href = "{% url 'export_report' %}";
+  }
+</script>
+{% endblock %}
