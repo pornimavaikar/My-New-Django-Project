@@ -1,28 +1,18 @@
 services:
   - type: web
-    name: taskmanager
+    name: builtspace
     env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      cd taskmanager && python manage.py collectstatic --noinput
-      cd taskmanager && python manage.py migrate
-    startCommand: cd taskmanager && PYTHONPATH=. gunicorn taskmanager.wsgi:application --bind 0.0.0.0:$PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: >
+      gunicorn taskmanager.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 3
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.11
       - key: DATABASE_URL
         fromDatabase:
-          name: taskmanager_db
+          name: builtspace-db
           property: connectionString
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DEBUG
-        value: false
+        value: False
       - key: DJANGO_ALLOWED_HOSTS
-        value: ".onrender.com"
-
-databases:
-  - name: taskmanager_db
-    databaseName: taskmanager
-    plan: free
-    ipAllowList: []
+        value: "builtspace.onrender.com,.onrender.com"
