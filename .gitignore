@@ -1,29 +1,11 @@
-# Virtual Environment
+.env
+*.sqlite3
+__pycache__/
+*.pyc
+staticfiles/
+task_files/
+db.sqlite3
 venv/
 taskmanager/venv/
-**/venv/
-
-# Python
-__pycache__/
-*.py[cod]
-*.so
-
-# Django
-*.log
-*.pot
-*.pyc
-db.sqlite3
-media/
-staticfiles/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-# Environment
-.env
-.env.local
-
-# Project specific
-task_files/
+taskmanager/2.1.0/
+taskmanager/2.9.9/
