@@ -17,6 +17,8 @@ services:
         fromDatabase:
           name: builtspace-db
           property: connectionString
+      - key: DJANGO_DB_CONN_MAX_AGE
+        value: 600
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DEBUG

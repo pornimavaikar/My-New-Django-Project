@@ -75,6 +75,7 @@ TEMPLATES = [
         },
     },
 ]
+# Add to your LOGGING configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -84,16 +85,20 @@ LOGGING = {
         },
     },
     'loggers': {
-        'django': {
+        'django.contrib.auth': {
             'handlers': ['console'],
             'level': 'DEBUG',
         },
         'django.db.backends': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'DEBUG',
         },
     },
 }
+# Add to settings.py
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+]
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -116,7 +121,7 @@ WSGI_APPLICATION = 'taskmanager.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default='sqlite:///db.sqlite3',
-        conn_max_age=60,
+        conn_max_age=600,
         conn_health_checks=True,
     )
 }
