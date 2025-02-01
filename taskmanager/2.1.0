@@ -1,0 +1,6 @@
+Requirement already satisfied: dj-database-url in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (2.3.0)
+Requirement already satisfied: Django>=4.2 in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (from dj-database-url) (5.0)
+Requirement already satisfied: typing-extensions>=3.10.0.0 in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (from dj-database-url) (4.12.2)
+Requirement already satisfied: asgiref>=3.7.0 in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (from Django>=4.2->dj-database-url) (3.8.1)
+Requirement already satisfied: sqlparse>=0.3.1 in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (from Django>=4.2->dj-database-url) (0.5.3)
+Requirement already satisfied: tzdata in c:\users\prath\project3 (2)\project3\taskmanager\venv\lib\site-packages (from Django>=4.2->dj-database-url) (2024.2)
