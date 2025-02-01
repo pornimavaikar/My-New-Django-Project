@@ -64,13 +64,22 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': True,
+        'APP_DIRS': False,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+            ],
+            'loaders': [
+                ('django.template.loaders.cached.Loader', [
+                    'django.template.loaders.filesystem.Loader',
+                    'django.template.loaders.app_directories.Loader',
+                ]) if not DEBUG else (
+                    'django.template.loaders.filesystem.Loader',
+                    'django.template.loaders.app_directories.Loader',
+                ),
             ],
         },
     },
@@ -121,12 +130,21 @@ WSGI_APPLICATION = 'taskmanager.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default='sqlite:///db.sqlite3',
-        conn_max_age=600,
+        conn_max_age=1800,
         conn_health_checks=True,
+       ssl_require=True 
     )
 }
+DATABASE_OPTIONS = {
+    'connect_timeout': 30,
+    'options': '-c statement_timeout=30000'
+}
+# Add to settings.py
+CONN_MAX_AGE = 1800  # 30 minutes
 
-# Add these new settings to your settings.py
+# Database connection retry settings
+DB_RETRY_DELAY = 1  # seconds
+DB_MAX_RETRIES = 3
 
 # Session configuration
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'

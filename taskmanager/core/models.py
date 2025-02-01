@@ -105,6 +105,13 @@ class CustomUser(AbstractUser):
         elif self.role == 'SRM':
             return self.reporting_users.all()  # RMs
         return CustomUser.objects.none()
+    
+    class Meta:
+        db_table = 'auth_user'  
+        
+    def __str__(self):
+        return self.username
+    
 class Task(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
